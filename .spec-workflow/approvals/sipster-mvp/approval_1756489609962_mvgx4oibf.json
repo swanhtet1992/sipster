@@ -1,0 +1,21 @@
+{
+  "id": "approval_1756489609962_mvgx4oibf",
+  "title": "Requirements Document for Sipster MVP",
+  "filePath": ".spec-workflow/specs/sipster-mvp/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-08-29T17:46:49.962Z",
+  "category": "spec",
+  "categoryName": "sipster-mvp",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. The app should focus multi-platform and the design should be considered differently for desktop apps and mobile apps.\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"The app should focus multi-platform and the design should be considered differently for desktop apps and mobile apps.\",\n      \"timestamp\": \"2025-08-29T17:52:06.201Z\",\n      \"id\": \"comment_1756489926201_dbvigqttj\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. The app should focus multi-platform and the design should be considered differently for desktop apps and mobile apps.\\n\\n\",\n  \"timestamp\": \"2025-08-29T17:52:08.992Z\"\n}",
+  "respondedAt": "2025-08-29T17:52:09.009Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "The app should focus multi-platform and the design should be considered differently for desktop apps and mobile apps.",
+      "timestamp": "2025-08-29T17:52:06.201Z",
+      "id": "comment_1756489926201_dbvigqttj"
+    }
+  ]
+}

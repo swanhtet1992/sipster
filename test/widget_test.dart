@@ -17,10 +17,7 @@ void main() {
     // Wait for any async operations to complete
     await tester.pumpAndSettle();
 
-    // Verify that we either see the loading state or the app has loaded
-    expect(
-      find.byType(CircularProgressIndicator).or(find.text('Sipster')),
-      findsOneWidget,
-    );
+    // Verify that the app title is present
+    expect(find.text('Sipster'), findsOneWidget);
   });
 }
