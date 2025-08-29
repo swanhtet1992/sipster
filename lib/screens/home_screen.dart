@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/hydration_session.dart';
 import '../models/boba_character.dart';
-import '../models/user.dart';
 import '../services/session_service.dart';
 import '../services/character_service.dart';
 import '../services/user_service.dart';
@@ -9,6 +8,8 @@ import '../services/hydration_calculator.dart';
 import '../widgets/progress_bar.dart';
 import '../widgets/character_grid.dart';
 import '../widgets/session_controls.dart';
+import '../theme/design_constants.dart';
+import '../utils/platform_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,9 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final UserService _userService = UserService();
   final HydrationCalculator _calculator = HydrationCalculator();
 
-  User? _user;
   HydrationSession? _currentSession;
-  List<HydrationSession> _todaySessions = [];
   List<BobaCharacter> _unlockedCharacters = [];
   Map<String, dynamic>? _hydrationStats;
   bool _isLoading = true;
@@ -56,9 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       setState(() {
-        _user = user;
         _currentSession = currentSession;
-        _todaySessions = todaySessions;
         _unlockedCharacters = unlockedCharacters;
         _hydrationStats = stats;
         _isLoading = false;
@@ -97,8 +94,10 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               if (weight != null && weight! > 0) {
                 await _userService.createUser(weightKg: weight!);
-                Navigator.of(context).pop();
-                _loadData();
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                  _loadData();
+                }
               }
             },
             child: const Text('Start'),
@@ -123,67 +122,36 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final isDesktop = PlatformUtils.isDesktop(context);
+    final isTablet = PlatformUtils.isTablet(context);
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sipster'),
-        backgroundColor: Colors.purple.shade100,
-        elevation: 0,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(
+          isDesktop ? DesignConstants.headerHeight + 20 : DesignConstants.headerHeight,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: DesignConstants.headerGradient,
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? DesignConstants.spacingXXL : DesignConstants.spacingL,
+                vertical: DesignConstants.spacingS,
+              ),
+              child: _buildAppBarContent(context, isDesktop),
+            ),
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_hydrationStats?['safetyWarning']?.isNotEmpty == true)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade300),
-                  ),
-                  child: Text(
-                    _hydrationStats!['safetyWarning'],
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              
-              ProgressBar(
-                progress: _hydrationStats?['progressPercent'] ?? 0,
-                current: _hydrationStats?['totalToday'] ?? 0,
-                goal: _hydrationStats?['dailyGoal'] ?? 0,
-                kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
-              ),
-              
-              const SizedBox(height: 24),
-              
-              CharacterGrid(
-                characters: _unlockedCharacters,
-                status: _characterService.getArmyStatus(
-                  _unlockedCharacters,
-                  _hydrationStats?['hourlyRate'] ?? 0,
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              SessionControls(
-                currentSession: _currentSession,
-                containers: _sessionService.getDefaultContainers(),
-                onSessionStart: _startSession,
-                onSessionEnd: _endSession,
-                onSessionCancel: _cancelSession,
-              ),
-            ],
-          ),
-        ),
+        child: isDesktop
+            ? _buildDesktopLayout(context)
+            : isTablet
+                ? _buildTabletLayout(context)
+                : _buildMobileLayout(context),
       ),
     );
   }
@@ -191,10 +159,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _startSession(String containerType) async {
     try {
       final targetMl = _sessionService.parseContainerSize(containerType);
-      await _sessionService.startSession(containerType, targetMl);
+      
+      // Only start new session if none exists
+      if (_currentSession == null) {
+        await _sessionService.startSession(containerType, targetMl);
+      }
+      
       _loadData();
     } catch (e) {
       _showError('Failed to start session: $e');
+    }
+  }
+
+  Future<void> _switchContainer(String containerType) async {
+    try {
+      final targetMl = _sessionService.parseContainerSize(containerType);
+      await _sessionService.startNewSession(containerType, targetMl);
+      _loadData();
+    } catch (e) {
+      _showError('Failed to switch container: $e');
     }
   }
 
@@ -227,6 +210,313 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       _showError('Failed to cancel session: $e');
     }
+  }
+
+  Widget _buildAppBarContent(BuildContext context, bool isDesktop) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Army Counter Badge
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? DesignConstants.spacingXL : DesignConstants.spacingL,
+            vertical: DesignConstants.spacingS,
+          ),
+          decoration: BoxDecoration(
+            color: DesignConstants.primary.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(DesignConstants.radiusXL),
+          ),
+          child: Row(
+            children: [
+              Text('🧋', style: TextStyle(fontSize: isDesktop ? 20 : 16)),
+              const SizedBox(width: DesignConstants.spacingXS),
+              Text(
+                'Army: ${_unlockedCharacters.length} Bobas',
+                style: TextStyle(
+                  fontFamily: 'SF Pro Text',
+                  fontSize: isDesktop ? DesignConstants.fontTitle : DesignConstants.fontSubtitle,
+                  fontWeight: FontWeight.w600,
+                  color: DesignConstants.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Daily Progress Crown
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: isDesktop ? 80 : 60,
+                  height: isDesktop ? 80 : 60,
+                  child: CircularProgressIndicator(
+                    value: (_hydrationStats?['progressPercent'] ?? 0) / 100,
+                    backgroundColor: DesignConstants.cupRim,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      DesignConstants.success,
+                    ),
+                    strokeWidth: isDesktop ? 6 : 4,
+                  ),
+                ),
+                Column(
+                  children: [
+                    Text('👑', style: TextStyle(fontSize: isDesktop ? 24 : 16)),
+                    Text(
+                      '${(_hydrationStats?['progressPercent'] ?? 0).round()}%',
+                      style: TextStyle(
+                        fontFamily: 'SF Pro Display',
+                        fontSize: isDesktop ? DesignConstants.fontSubtitle : DesignConstants.fontCaption,
+                        fontWeight: FontWeight.bold,
+                        color: DesignConstants.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: DesignConstants.spacingXS),
+            Text(
+              "Today's Victory",
+              style: TextStyle(
+                fontFamily: 'SF Pro Text',
+                fontSize: isDesktop ? DesignConstants.fontBody : DesignConstants.fontSmall,
+                color: DesignConstants.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        // Session Status Indicator
+        if (_currentSession != null)
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? DesignConstants.spacingL : DesignConstants.spacingM,
+              vertical: DesignConstants.spacingXS,
+            ),
+            decoration: BoxDecoration(
+              color: DesignConstants.success.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(DesignConstants.radiusM),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.local_drink,
+                  color: DesignConstants.pearlWhite,
+                  size: isDesktop ? 18 : 14,
+                ),
+                const SizedBox(width: DesignConstants.spacingXS),
+                Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: isDesktop ? DesignConstants.fontBody : DesignConstants.fontSmall,
+                    fontWeight: FontWeight.bold,
+                    color: DesignConstants.pearlWhite,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(width: isDesktop ? 120 : 80), // Maintain layout balance
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(DesignConstants.spacingXXL),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left Column - Primary content
+          Expanded(
+            flex: 2,
+            child: Column(
+              children: [
+                _buildSafetyWarning(),
+                const SizedBox(height: DesignConstants.spacingL),
+                ProgressBar(
+                  progress: _hydrationStats?['progressPercent'] ?? 0,
+                  current: _hydrationStats?['totalToday'] ?? 0,
+                  goal: _hydrationStats?['dailyGoal'] ?? 0,
+                  kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
+                ),
+                const SizedBox(height: DesignConstants.spacingXL),
+                SessionControls(
+                  currentSession: _currentSession,
+                  containers: _sessionService.getDefaultContainers(),
+                  onSessionStart: _startSession,
+                  onSessionEnd: _endSession,
+                  onSessionCancel: _cancelSession,
+                  onSwitchContainer: _switchContainer,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DesignConstants.spacingXXL),
+          // Right Column - Character grid
+          Expanded(
+            flex: 1,
+            child: Column(
+              children: [
+                Text(
+                  'Your Boba Army',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: DesignConstants.fontTitle,
+                    fontWeight: FontWeight.bold,
+                    color: DesignConstants.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: DesignConstants.spacingL),
+                CharacterGrid(
+                  characters: _unlockedCharacters,
+                  status: _characterService.getArmyStatus(
+                    _unlockedCharacters,
+                    _hydrationStats?['hourlyRate'] ?? 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabletLayout(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(DesignConstants.spacingXL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSafetyWarning(),
+          const SizedBox(height: DesignConstants.spacingL),
+          
+          // Two-column layout for tablet
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left side - Progress and controls
+              Expanded(
+                flex: 3,
+                child: Column(
+                  children: [
+                    ProgressBar(
+                      progress: _hydrationStats?['progressPercent'] ?? 0,
+                      current: _hydrationStats?['totalToday'] ?? 0,
+                      goal: _hydrationStats?['dailyGoal'] ?? 0,
+                      kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
+                    ),
+                    const SizedBox(height: DesignConstants.spacingXL),
+                    SessionControls(
+                      currentSession: _currentSession,
+                      containers: _sessionService.getDefaultContainers(),
+                      onSessionStart: _startSession,
+                      onSessionEnd: _endSession,
+                      onSessionCancel: _cancelSession,
+                      onSwitchContainer: _switchContainer,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DesignConstants.spacingXL),
+              // Right side - Characters
+              Expanded(
+                flex: 2,
+                child: CharacterGrid(
+                  characters: _unlockedCharacters,
+                  status: _characterService.getArmyStatus(
+                    _unlockedCharacters,
+                    _hydrationStats?['hourlyRate'] ?? 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(DesignConstants.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSafetyWarning(),
+          const SizedBox(height: DesignConstants.spacingL),
+          ProgressBar(
+            progress: _hydrationStats?['progressPercent'] ?? 0,
+            current: _hydrationStats?['totalToday'] ?? 0,
+            goal: _hydrationStats?['dailyGoal'] ?? 0,
+            kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
+          ),
+          const SizedBox(height: DesignConstants.spacingXL),
+          CharacterGrid(
+            characters: _unlockedCharacters,
+            status: _characterService.getArmyStatus(
+              _unlockedCharacters,
+              _hydrationStats?['hourlyRate'] ?? 0,
+            ),
+          ),
+          const SizedBox(height: DesignConstants.spacingXL),
+          SessionControls(
+            currentSession: _currentSession,
+            containers: _sessionService.getDefaultContainers(),
+            onSessionStart: _startSession,
+            onSessionEnd: _endSession,
+            onSessionCancel: _cancelSession,
+            onSwitchContainer: _switchContainer,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyWarning() {
+    if (_hydrationStats?['safetyWarning']?.isNotEmpty != true) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(DesignConstants.spacingM),
+      margin: const EdgeInsets.only(bottom: DesignConstants.spacingL),
+      decoration: BoxDecoration(
+        color: DesignConstants.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(DesignConstants.radiusM),
+        border: Border.all(
+          color: DesignConstants.warning.withValues(alpha: 0.3),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_rounded,
+            color: DesignConstants.warning,
+            size: 20,
+          ),
+          const SizedBox(width: DesignConstants.spacingS),
+          Expanded(
+            child: Text(
+              _hydrationStats!['safetyWarning'],
+              style: TextStyle(
+                fontFamily: 'SF Pro Text',
+                fontSize: DesignConstants.fontBody,
+                fontWeight: FontWeight.w500,
+                color: DesignConstants.warning,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showCharacterUnlocked(BobaCharacter character) {
