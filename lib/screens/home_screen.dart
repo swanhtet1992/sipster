@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/hydration_session.dart';
 import '../models/boba_character.dart';
+import '../models/safety_warning.dart';
 import '../services/session_service.dart';
 import '../services/character_service.dart';
 import '../services/user_service.dart';
@@ -8,6 +9,7 @@ import '../services/hydration_calculator.dart';
 import '../widgets/progress_bar.dart';
 import '../widgets/character_grid.dart';
 import '../widgets/session_controls.dart';
+import '../widgets/safety_warning_dialog.dart';
 import '../theme/design_constants.dart';
 import '../utils/platform_utils.dart';
 
@@ -185,19 +187,35 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentSession == null) return;
 
     try {
+      // Calculate session duration for safety evaluation
+      final sessionDuration = DateTime.now().difference(_currentSession!.startTime);
+      
+      // Evaluate session safety before ending
+      final safetyWarning = _calculator.evaluateSessionSafety(actualMl, sessionDuration);
+      
+      // End the session first
       await _sessionService.endSession(_currentSession!.id, actualMl);
       
+      // Check for character unlock
       final newCharacter = await _characterService.checkForNewUnlock(
         totalIntake: _hydrationStats?['totalToday'] ?? 0,
         streak: 1, // TODO: Calculate actual streak
         goalReached: _hydrationStats?['goalReached'] ?? false,
       );
 
-      if (newCharacter != null) {
+      // Reload data to get updated stats
+      await _loadData();
+
+      // Show safety warning if present (after data reload)
+      if (safetyWarning != null && mounted) {
+        await _showSafetyWarning(safetyWarning);
+      }
+
+      // Show character unlock after safety warning (if any)
+      if (newCharacter != null && mounted) {
         _showCharacterUnlocked(newCharacter);
       }
       
-      _loadData();
     } catch (e) {
       _showError('Failed to end session: $e');
     }
@@ -334,52 +352,57 @@ class _HomeScreenState extends State<HomeScreen> {
           // Left Column - Primary content
           Expanded(
             flex: 2,
-            child: Column(
-              children: [
-                _buildSafetyWarning(),
-                const SizedBox(height: DesignConstants.spacingL),
-                ProgressBar(
-                  progress: _hydrationStats?['progressPercent'] ?? 0,
-                  current: _hydrationStats?['totalToday'] ?? 0,
-                  goal: _hydrationStats?['dailyGoal'] ?? 0,
-                  kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
-                ),
-                const SizedBox(height: DesignConstants.spacingXL),
-                SessionControls(
-                  currentSession: _currentSession,
-                  containers: _sessionService.getDefaultContainers(),
-                  onSessionStart: _startSession,
-                  onSessionEnd: _endSession,
-                  onSessionCancel: _cancelSession,
-                  onSwitchContainer: _switchContainer,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildSafetyWarning(),
+                  const SizedBox(height: DesignConstants.spacingL),
+                  ProgressBar(
+                    progress: (_hydrationStats?['progressPercent'] ?? 0).toDouble(),
+                    current: (_hydrationStats?['totalToday'] ?? 0).toDouble(),
+                    goal: (_hydrationStats?['dailyGoal'] ?? 0).toDouble(),
+                    kidneyLoad: (_hydrationStats?['kidneyLoad'] ?? 0).toDouble(),
+                  ),
+                  const SizedBox(height: DesignConstants.spacingXL),
+                  SessionControls(
+                    currentSession: _currentSession,
+                    containers: _sessionService.getDefaultContainers(),
+                    onSessionStart: _startSession,
+                    onSessionEnd: _endSession,
+                    onSessionCancel: _cancelSession,
+                    onSwitchContainer: _switchContainer,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: DesignConstants.spacingXXL),
           // Right Column - Character grid
           Expanded(
             flex: 1,
-            child: Column(
-              children: [
-                Text(
-                  'Your Boba Army',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: DesignConstants.fontTitle,
-                    fontWeight: FontWeight.bold,
-                    color: DesignConstants.textPrimary,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Boba Army',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      fontSize: DesignConstants.fontTitle,
+                      fontWeight: FontWeight.bold,
+                      color: DesignConstants.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: DesignConstants.spacingL),
-                CharacterGrid(
-                  characters: _unlockedCharacters,
-                  status: _characterService.getArmyStatus(
-                    _unlockedCharacters,
-                    _hydrationStats?['hourlyRate'] ?? 0,
+                  const SizedBox(height: DesignConstants.spacingL),
+                  CharacterGrid(
+                    characters: _unlockedCharacters,
+                    status: _characterService.getArmyStatus(
+                      _unlockedCharacters,
+                      _hydrationStats?['hourlyRate'] ?? 0,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -403,24 +426,26 @@ class _HomeScreenState extends State<HomeScreen> {
               // Left side - Progress and controls
               Expanded(
                 flex: 3,
-                child: Column(
-                  children: [
-                    ProgressBar(
-                      progress: _hydrationStats?['progressPercent'] ?? 0,
-                      current: _hydrationStats?['totalToday'] ?? 0,
-                      goal: _hydrationStats?['dailyGoal'] ?? 0,
-                      kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
-                    ),
-                    const SizedBox(height: DesignConstants.spacingXL),
-                    SessionControls(
-                      currentSession: _currentSession,
-                      containers: _sessionService.getDefaultContainers(),
-                      onSessionStart: _startSession,
-                      onSessionEnd: _endSession,
-                      onSessionCancel: _cancelSession,
-                      onSwitchContainer: _switchContainer,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      ProgressBar(
+                        progress: (_hydrationStats?['progressPercent'] ?? 0).toDouble(),
+                        current: (_hydrationStats?['totalToday'] ?? 0).toDouble(),
+                        goal: (_hydrationStats?['dailyGoal'] ?? 0).toDouble(),
+                        kidneyLoad: (_hydrationStats?['kidneyLoad'] ?? 0).toDouble(),
+                      ),
+                      const SizedBox(height: DesignConstants.spacingXL),
+                      SessionControls(
+                        currentSession: _currentSession,
+                        containers: _sessionService.getDefaultContainers(),
+                        onSessionStart: _startSession,
+                        onSessionEnd: _endSession,
+                        onSessionCancel: _cancelSession,
+                        onSwitchContainer: _switchContainer,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: DesignConstants.spacingXL),
@@ -451,10 +476,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildSafetyWarning(),
           const SizedBox(height: DesignConstants.spacingL),
           ProgressBar(
-            progress: _hydrationStats?['progressPercent'] ?? 0,
-            current: _hydrationStats?['totalToday'] ?? 0,
-            goal: _hydrationStats?['dailyGoal'] ?? 0,
-            kidneyLoad: _hydrationStats?['kidneyLoad'] ?? 0,
+            progress: (_hydrationStats?['progressPercent'] ?? 0).toDouble(),
+            current: (_hydrationStats?['totalToday'] ?? 0).toDouble(),
+            goal: (_hydrationStats?['dailyGoal'] ?? 0).toDouble(),
+            kidneyLoad: (_hydrationStats?['kidneyLoad'] ?? 0).toDouble(),
           ),
           const SizedBox(height: DesignConstants.spacingXL),
           CharacterGrid(
@@ -516,6 +541,21 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showSafetyWarning(SafetyWarning warning) async {
+    return await SafetyWarningDialog.show(
+      context: context,
+      warning: warning,
+      onDismiss: () => Navigator.of(context).pop(),
+      onPause: warning.level == SafetyLevel.warning 
+          ? () {
+              Navigator.of(context).pop();
+              // Could add session pause logic here if needed
+            }
+          : null,
+      onContinue: () => Navigator.of(context).pop(),
     );
   }
 

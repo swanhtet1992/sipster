@@ -168,7 +168,7 @@ class HydrationCalculator {
 
   /// Evaluate session safety and return appropriate warning
   SafetyWarning? evaluateSessionSafety(double ml, Duration duration) {
-    final ratePerHour = (ml / duration.inMinutes) * 60;
+    final ratePerHour = (ml / duration.inMinutes.toDouble()) * 60;
     
     // Danger level - immediate health risk
     if (ml > 500 && duration.inMinutes < 10) {
