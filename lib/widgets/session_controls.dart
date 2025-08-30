@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/hydration_session.dart';
@@ -29,10 +30,12 @@ class SessionControls extends StatefulWidget {
 class _SessionControlsState extends State<SessionControls> {
   bool _readyToLog = false;
   final FocusNode _focusNode = FocusNode();
+  Timer? _sessionTimer;
 
   @override
   void initState() {
     super.initState();
+    _startSessionTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (PlatformUtils.isDesktop(context)) {
         _focusNode.requestFocus();
@@ -42,6 +45,7 @@ class _SessionControlsState extends State<SessionControls> {
 
   @override
   void dispose() {
+    _sessionTimer?.cancel();
     _focusNode.dispose();
     super.dispose();
   }
@@ -52,6 +56,21 @@ class _SessionControlsState extends State<SessionControls> {
     // Reset ready to log state when session changes
     if (widget.currentSession?.id != oldWidget.currentSession?.id) {
       _readyToLog = false;
+      _startSessionTimer(); // Restart timer when session changes
+    }
+  }
+
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    if (widget.currentSession != null) {
+      // Update timer every second when there's an active session
+      _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted && widget.currentSession != null) {
+          setState(() {
+            // This will trigger a rebuild and update the displayed time
+          });
+        }
+      });
     }
   }
 
