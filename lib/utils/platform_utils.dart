@@ -11,29 +11,53 @@ class PlatformUtils {
 
   /// Check if the current platform is mobile (phone)
   static bool isMobile(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    
     if (kIsWeb) {
-      return MediaQuery.of(context).size.width < mobileMaxWidth;
+      return width < mobileMaxWidth;
     }
-    return Platform.isAndroid || Platform.isIOS;
+    
+    // For native mobile platforms
+    if (Platform.isAndroid || Platform.isIOS) {
+      return true;
+    }
+    
+    // For desktop platforms, check window size for responsive behavior
+    if (Platform.isMacOS || Platform.isLinux || Platform.isWindows) {
+      return width < mobileMaxWidth;
+    }
+    
+    return false;
   }
 
   /// Check if the current platform is tablet
   static bool isTablet(BuildContext context) {
-    if (kIsWeb) {
-      final width = MediaQuery.of(context).size.width;
-      return width >= mobileMaxWidth && width < desktopMinWidth;
+    final width = MediaQuery.of(context).size.width;
+    
+    // Use screen width for responsive behavior on all platforms
+    if (width >= mobileMaxWidth && width < desktopMinWidth) {
+      return true;
     }
-    // For native platforms, use screen size to determine tablet
-    final shortestSide = MediaQuery.of(context).size.shortestSide;
-    return shortestSide >= 600; // Typical tablet threshold
+    
+    // Additional check for native tablets using shortest side
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final shortestSide = MediaQuery.of(context).size.shortestSide;
+      return shortestSide >= 600 && width >= mobileMaxWidth && width < desktopMinWidth;
+    }
+    
+    return false;
   }
 
   /// Check if the current platform is desktop
   static bool isDesktop(BuildContext context) {
-    if (kIsWeb) {
-      return MediaQuery.of(context).size.width >= desktopMinWidth;
+    final width = MediaQuery.of(context).size.width;
+    
+    // Use screen width for responsive behavior on all platforms
+    if (width >= desktopMinWidth) {
+      return true;
     }
-    return Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+    
+    return false;
   }
 
   /// Get platform-appropriate padding based on screen size
@@ -91,7 +115,11 @@ class PlatformUtils {
 
   /// Check if the platform supports hover interactions
   static bool supportsHover(BuildContext context) {
-    return isDesktop(context) && !kIsWeb;
+    // Desktop platforms support hover regardless of window size
+    if (!kIsWeb && (Platform.isMacOS || Platform.isLinux || Platform.isWindows)) {
+      return true;
+    }
+    return false;
   }
 
   /// Get responsive font size based on platform
