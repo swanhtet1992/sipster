@@ -74,13 +74,42 @@ class _SessionControlsState extends State<SessionControls> {
     }
   }
 
+  BoxDecoration _getSessionControlDecoration(BuildContext context) {
+    // Get status-based colors like the Boba Army widget
+    final statusColor = widget.currentSession != null ? DesignConstants.success : DesignConstants.primary;
+    
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          statusColor.withValues(alpha: 0.1),
+          statusColor.withValues(alpha: 0.05),
+          DesignConstants.secondary.withValues(alpha: 0.05),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(DesignConstants.radiusL),
+      border: Border.all(
+        color: statusColor.withValues(alpha: 0.3),
+        width: 2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: statusColor.withValues(alpha: 0.1),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: PlatformUtils.isDesktop(context) ? _handleKeyEvent : null,
       child: Container(
-        decoration: DesignConstants.cardDecoration,
+        decoration: _getSessionControlDecoration(context),
         child: Padding(
           padding: EdgeInsets.all(
             PlatformUtils.isMobile(context) 
@@ -654,28 +683,11 @@ class _SessionControlsState extends State<SessionControls> {
       itemCount: widget.containers.length,
       itemBuilder: (context, index) {
         final container = widget.containers[index];
-        return ElevatedButton(
+        return EnhancedContainerButton(
+          container: container,
+          index: index,
           onPressed: () => widget.onSessionStart(container),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade50,
-            foregroundColor: Colors.blue.shade700,
-            elevation: 0,
-            padding: padding,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: Text(container, overflow: TextOverflow.ellipsis)),
-              Text(
-                '${index + 1}',
-                style: TextStyle(
-                  color: Colors.blue.shade400,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          showKeyboardHint: true,
         );
       },
     );
@@ -694,15 +706,11 @@ class _SessionControlsState extends State<SessionControls> {
       itemCount: widget.containers.length,
       itemBuilder: (context, index) {
         final container = widget.containers[index];
-        return ElevatedButton(
+        return EnhancedContainerButton(
+          container: container,
+          index: index,
           onPressed: () => widget.onSessionStart(container),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade50,
-            foregroundColor: Colors.blue.shade700,
-            elevation: 0,
-            padding: padding,
-          ),
-          child: Text(container, overflow: TextOverflow.ellipsis),
+          showKeyboardHint: false,
         );
       },
     );
@@ -712,16 +720,14 @@ class _SessionControlsState extends State<SessionControls> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: widget.containers.map((container) {
-        return ElevatedButton(
+      children: widget.containers.asMap().entries.map((entry) {
+        final index = entry.key;
+        final container = entry.value;
+        return EnhancedContainerButton(
+          container: container,
+          index: index,
           onPressed: () => widget.onSessionStart(container),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade50,
-            foregroundColor: Colors.blue.shade700,
-            elevation: 0,
-            padding: padding,
-          ),
-          child: Text(container),
+          showKeyboardHint: false,
         );
       }).toList(),
     );
@@ -910,6 +916,204 @@ class _SessionControlsState extends State<SessionControls> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class EnhancedContainerButton extends StatefulWidget {
+  final String container;
+  final int index;
+  final VoidCallback onPressed;
+  final bool showKeyboardHint;
+
+  const EnhancedContainerButton({
+    super.key,
+    required this.container,
+    required this.index,
+    required this.onPressed,
+    this.showKeyboardHint = false,
+  });
+
+  @override
+  State<EnhancedContainerButton> createState() => _EnhancedContainerButtonState();
+}
+
+class _EnhancedContainerButtonState extends State<EnhancedContainerButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: DesignConstants.animationNormal,
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Color _getContainerColor(String container) {
+    // Assign colors based on container type/name
+    final lowerContainer = container.toLowerCase();
+    if (lowerContainer.contains('water')) {
+      return DesignConstants.primary; // Taro purple for water
+    } else if (lowerContainer.contains('tea') || lowerContainer.contains('coffee')) {
+      return DesignConstants.brownSugar; // Brown sugar for tea/coffee
+    } else if (lowerContainer.contains('juice') || lowerContainer.contains('fruit')) {
+      return DesignConstants.strawberryPink; // Pink for fruit drinks
+    } else if (lowerContainer.contains('milk') || lowerContainer.contains('smoothie')) {
+      return DesignConstants.milkTeaBeige; // Beige for milk-based
+    } else if (lowerContainer.contains('sports') || lowerContainer.contains('energy')) {
+      return DesignConstants.matchaGreen; // Green for energy drinks
+    } else {
+      // Assign colors by index to ensure variety
+      final colors = [
+        DesignConstants.primary,
+        DesignConstants.success,
+        DesignConstants.warning,
+        DesignConstants.strawberryPink,
+        DesignConstants.thaiTeaOrange,
+      ];
+      return colors[widget.index % colors.length];
+    }
+  }
+
+  IconData _getContainerIcon(String container) {
+    final lowerContainer = container.toLowerCase();
+    if (lowerContainer.contains('water')) {
+      return Icons.water_drop;
+    } else if (lowerContainer.contains('tea')) {
+      return Icons.local_cafe;
+    } else if (lowerContainer.contains('coffee')) {
+      return Icons.coffee;
+    } else if (lowerContainer.contains('juice') || lowerContainer.contains('fruit')) {
+      return Icons.local_drink;
+    } else if (lowerContainer.contains('milk')) {
+      return Icons.local_bar;
+    } else if (lowerContainer.contains('bottle')) {
+      return Icons.sports_bar;
+    } else if (lowerContainer.contains('cup') || lowerContainer.contains('mug')) {
+      return Icons.emoji_food_beverage;
+    } else {
+      return Icons.local_drink;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final containerColor = _getContainerColor(widget.container);
+    final isDesktop = PlatformUtils.isDesktop(context);
+    final supportsHover = PlatformUtils.supportsHover(context);
+    
+    return MouseRegion(
+      onEnter: supportsHover ? (_) => _animationController.forward() : null,
+      onExit: supportsHover ? (_) => _animationController.reverse() : null,
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: AnimatedContainer(
+                duration: DesignConstants.animationFast,
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      containerColor.withValues(alpha: 0.15),
+                      containerColor.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: containerColor.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(DesignConstants.radiusM),
+                  boxShadow: [
+                    BoxShadow(
+                      color: containerColor.withValues(alpha: 0.2),
+                      blurRadius: _scaleAnimation.value > 1.0 ? 8 : 4,
+                      offset: Offset(0, _scaleAnimation.value > 1.0 ? 4 : 2),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.all(isDesktop ? DesignConstants.spacingM : DesignConstants.spacingS),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Container Icon
+                    Container(
+                      padding: const EdgeInsets.all(DesignConstants.spacingXS),
+                      decoration: BoxDecoration(
+                        color: containerColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(DesignConstants.radiusS),
+                      ),
+                      child: Icon(
+                        _getContainerIcon(widget.container),
+                        size: isDesktop ? 18 : 16,
+                        color: containerColor,
+                      ),
+                    ),
+                    
+                    // Container Name
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: DesignConstants.spacingS),
+                        child: Text(
+                          widget.container,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: isDesktop ? DesignConstants.fontBody : DesignConstants.fontCaption,
+                            fontWeight: FontWeight.w600,
+                            color: DesignConstants.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    
+                    // Keyboard Hint
+                    if (widget.showKeyboardHint)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DesignConstants.spacingXS,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: containerColor.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(DesignConstants.spacingXS),
+                        ),
+                        child: Text(
+                          '${widget.index + 1}',
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: DesignConstants.fontSmall,
+                            fontWeight: FontWeight.bold,
+                            color: DesignConstants.pearlWhite,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

@@ -132,20 +132,32 @@ class _ProgressBarState extends State<ProgressBar>
 
   BoxDecoration _getContainerDecoration() {
     final warningColor = widget.currentWarning?.warningColor;
-    final borderColor = warningColor ?? DesignConstants.primary;
+    
+    // Get status-based color like the Boba Army widget
+    final statusColor = widget.progress >= 100 
+        ? DesignConstants.success 
+        : (widget.currentWarning?.isHighPriority == true ? warningColor ?? DesignConstants.warning : DesignConstants.primary);
     
     return BoxDecoration(
-      color: DesignConstants.backgroundPrimary,
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          statusColor.withValues(alpha: 0.1),
+          statusColor.withValues(alpha: 0.05),
+          DesignConstants.secondary.withValues(alpha: 0.05),
+        ],
+      ),
       borderRadius: BorderRadius.circular(DesignConstants.radiusL),
       border: Border.all(
-        color: borderColor.withValues(alpha: 0.3),
-        width: widget.currentWarning?.isHighPriority == true ? 2 : 1,
+        color: statusColor.withValues(alpha: 0.3),
+        width: 2,
       ),
       boxShadow: [
         BoxShadow(
-          color: borderColor.withValues(alpha: 0.1),
-          blurRadius: widget.currentWarning?.isHighPriority == true ? 8 : 4,
-          offset: const Offset(0, 2),
+          color: statusColor.withValues(alpha: 0.1),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
         ),
       ],
     );
