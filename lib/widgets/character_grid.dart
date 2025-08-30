@@ -20,23 +20,10 @@ class CharacterGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Get platform-specific dimensions and layout
-    final isDesktop = PlatformUtils.isDesktop(context);
-    final isTablet = PlatformUtils.isTablet(context);
-    
-    final characterCardSize = PlatformUtils.getCharacterCardSize(context);
-    final crossAxisCount = PlatformUtils.getGridCrossAxisCount(context);
     final platformPadding = PlatformUtils.getPlatformPadding(context);
     final platformSpacing = PlatformUtils.getPlatformSpacing(context);
     
-    // Calculate dynamic height based on content and platform
-    final baseHeight = isDesktop ? 300.0 : (isTablet ? 280.0 : 240.0);
-    final calculatedHeight = characters.isNotEmpty 
-        ? ((characters.length / crossAxisCount).ceil() * (characterCardSize + platformSpacing)) + 120
-        : baseHeight;
-    final displayHeight = calculatedHeight.clamp(baseHeight, isDesktop ? 400.0 : 320.0);
-
     return Container(
-      height: displayHeight,
       decoration: _getContainerDecoration(),
       child: Padding(
         padding: platformPadding,
@@ -47,7 +34,7 @@ class CharacterGrid extends StatelessWidget {
             SizedBox(height: platformSpacing * 0.5),
             _buildStatusBadge(context),
             SizedBox(height: platformSpacing),
-            Expanded(child: _buildCharacterContent(context)),
+            _buildCharacterContent(context),
           ],
         ),
       ),
@@ -204,12 +191,13 @@ class CharacterGrid extends StatelessWidget {
     final displayCharacters = characters.take(displayCount).toList();
 
     return GridView.builder(
+      shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        childAspectRatio: PlatformUtils.isDesktop(context) ? 0.9 : 0.8,
-        crossAxisSpacing: platformSpacing * 0.5,
-        mainAxisSpacing: platformSpacing * 0.5,
+        childAspectRatio: PlatformUtils.isDesktop(context) ? 0.9 : 0.85,
+        crossAxisSpacing: platformSpacing * 0.4,
+        mainAxisSpacing: platformSpacing * 0.4,
       ),
       itemCount: displayCharacters.length,
       itemBuilder: (context, index) {
@@ -412,9 +400,10 @@ class _ResponsiveCharacterCardState extends State<ResponsiveCharacterCard>
     final iconSize = cardSize * 0.4;
     
     return Padding(
-      padding: EdgeInsets.all(cardSize * 0.1),
+      padding: EdgeInsets.all(cardSize * 0.08),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Character Icon with mood animation
           AnimatedContainer(
@@ -438,17 +427,19 @@ class _ResponsiveCharacterCardState extends State<ResponsiveCharacterCard>
           SizedBox(height: cardSize * 0.08),
           
           // Character Name
-          Text(
-            widget.character.name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'SF Pro Text',
-              fontSize: isDesktop ? DesignConstants.fontCaption + 1 : DesignConstants.fontCaption,
-              fontWeight: FontWeight.w600,
-              color: DesignConstants.textPrimary,
+          Flexible(
+            child: Text(
+              widget.character.name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'SF Pro Text',
+                fontSize: isDesktop ? DesignConstants.fontCaption + 1 : DesignConstants.fontSmall + 1,
+                fontWeight: FontWeight.w600,
+                color: DesignConstants.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
           
           // Loyalty Level Badge
